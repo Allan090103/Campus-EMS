@@ -1,0 +1,13 @@
+# Dependencies
+frontend/node_modules/
+backend/vendor/
+
+# Build output
+frontend/dist/
+
+# Composer lock is usually committed; keep it. node lock too.
+# Environment / editor
+.env
+.DS_Store
+.vscode/
+*.log
