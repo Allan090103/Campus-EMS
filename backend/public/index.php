@@ -161,11 +161,26 @@ function eventsBaseQuery(): string
             JOIN users u ON u.id = e.organizer_id";
 }
 
-// GET /api/events  (public) - list approved events only, optional ?category= & ?search=
+function optionalUser(Request $req, array $config): ?array
+{
+    $header = $req->getHeaderLine('Authorization');
+
+    if (!preg_match('/Bearer\s+(.+)/i', $header, $m)) {
+        return null;
+    }
+
+    try {
+        return Token::decode($m[1], $config);
+    } catch (\Throwable $e) {
+        return null;
+    }
+}
+
+// GET /api/events  (public) - list upcoming approved events only, optional ?category= & ?search=
 $app->get('/api/events', function (Request $req, Response $res) {
     $params = $req->getQueryParams();
     $sql = eventsBaseQuery();
-    $where = ["e.status = 'approved'"];
+    $where = ["e.status = 'approved'", 'e.event_datetime > NOW()'];
     $args  = [];
 
     if (!empty($params['category']) && $params['category'] !== 'All') {
@@ -227,7 +242,7 @@ $app->get('/api/organizer/events', function (Request $req, Response $res) {
 })->add($organizerSide)->add($auth);
 
 // GET /api/events/{id}  (public) - single event
-$app->get('/api/events/{id}', function (Request $req, Response $res, array $a) {
+$app->get('/api/events/{id}', function (Request $req, Response $res, array $a) use ($config) {
     $pdo  = getDBConnection();
     $stmt = $pdo->prepare(eventsBaseQuery() . ' WHERE e.id = ?');
     $stmt->execute([$a['id']]);
@@ -235,6 +250,18 @@ $app->get('/api/events/{id}', function (Request $req, Response $res, array $a) {
     if (!$event) {
         return Json::error($res, 'Event not found.', 404);
     }
+
+    $user = optionalUser($req, $config);
+    $isAdmin = ($user['role'] ?? null) === 'admin';
+    $isOwnerOrganizer = ($user['role'] ?? null) === 'organizer'
+        && (int) $event['organizer_id'] === (int) $user['sub'];
+    $isPubliclyVisible = $event['status'] === 'approved'
+        && strtotime($event['event_datetime']) > time();
+
+    if (!$isPubliclyVisible && !$isAdmin && !$isOwnerOrganizer) {
+        return Json::error($res, 'Event not found.', 404);
+    }
+
     return Json::write($res, $event);
 });
 
@@ -429,6 +456,12 @@ $app->post('/api/registrations', function (Request $req, Response $res) use ($bo
     $event = $stmt->fetch();
     if (!$event) {
         return Json::error($res, 'Event not found.', 404);
+    }
+    if ($event['status'] !== 'approved') {
+        return Json::error($res, 'This event is not open for registration.', 409);
+    }
+    if (strtotime($event['event_datetime']) <= time()) {
+        return Json::error($res, 'Registration is closed for past events.', 409);
     }
 
     // Business rule: cannot register for the same event twice.

@@ -57,7 +57,7 @@ function view(id) {
   <main class="page">
     <div class="container">
       <h1 class="page-title">Available Events</h1>
-      <p class="page-subtitle">Browse and register for campus events</p>
+      <p class="page-subtitle">Browse and register for upcoming campus events</p>
 
       <div class="filters">
         <div class="input-icon search">
@@ -71,7 +71,7 @@ function view(id) {
       </div>
 
       <div v-if="loading" class="spinner">Loading events…</div>
-      <div v-else-if="events.length === 0" class="empty">No events match your search.</div>
+      <div v-else-if="events.length === 0" class="empty">No upcoming events match your search.</div>
       <div v-else class="grid-3">
         <EventCard v-for="ev in events" :key="ev.id" :event="ev"
                    :registered="myEventIds.has(ev.id)"

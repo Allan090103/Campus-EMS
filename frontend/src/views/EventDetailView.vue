@@ -13,9 +13,11 @@ const auth = useAuthStore()
 const event = ref(null)
 const myReg = ref(null)        // this student's registration row, if any
 const loading = ref(true)
+const error = ref('')
 
 async function load() {
   loading.value = true
+  error.value = ''
   try {
     const { data } = await api.get(`/events/${route.params.id}`)
     event.value = data
@@ -23,6 +25,9 @@ async function load() {
       const my = await api.get('/registrations/my')
       myReg.value = my.data.find((r) => r.event_id === Number(route.params.id)) || null
     }
+  } catch (e) {
+    event.value = null
+    error.value = e.response?.data?.error || 'Event not available.'
   } finally {
     loading.value = false
   }
@@ -65,6 +70,7 @@ async function cancel() {
       <a class="back-link" @click="router.back()"><AppIcon name="back" :size="16" /> Back</a>
 
       <div v-if="loading" class="spinner">Loading…</div>
+      <div v-else-if="error" class="empty">{{ error }}</div>
       <div v-else-if="event" class="card card-pad detail">
         <div class="detail-head">
           <h1 class="page-title">{{ event.title }}</h1>
